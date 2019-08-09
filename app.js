@@ -1,49 +1,3 @@
-function checkStatus(response) {
-  if (Math.floor(response.status / 100 === 2)) return Promise.resolve(response);
-  else return Promise.reject(`Error. Status code: ${response.status}`);
-}
-
-const json = response => response.json();
-
-
-//Custom HTTP Module
-function myHttp() {
-  return {
-    get(url) {
-      fetch(url)
-        .then(checkStatus)
-        .then(json)
-        .catch(err => console.log(err));
-      },
-    post(url, body, headers) {
-      fetch(url, {
-        method: 'POST',
-        body,
-        headers
-      })
-      .then(checkStatus)
-      .then(json)
-      .catch(err => console.log(err));
-    }
-  };
-}
-
-
-const http = myHttp();
-const newsServise = (function() {
-  const apiKey = "2c0f1ee00f8f46f5916226f221bf3858";
-  const apiUrl = "https://newsapi.org/v2";
-
-  return {
-    topHeadlines(country = "ua", category = "technology") {
-      http.get(`${apiUrl}/top-headlines?country=${country}&category=${category}&apiKey=${apiKey}`);
-    },
-    everything(text) {
-      http.get(`${apiUrl}/everything?q=${text}&apiKey=${apiKey}`);
-    }
-  };
-})();
-
 //Elements
 const newsContainer = document.querySelector(".news-container .row");
 const form = document.forms["newsControls"];
@@ -51,34 +5,47 @@ const countrySelect = form.elements["country"];
 const categorySelect = form.elements["category"];
 const searchEverythingNews = form.elements["autocomplete-input"];
 
-document.addEventListener("DOMContentLoaded", function() {
-  M.AutoInit();
-  loadNews();
-});
 
+//Custom HTTP Module
 
-const getNews = new Promise ((resolve, reject) => {
-  loadNews()
-});
-
-function loadNews() {
-  const countrySelectValue = countrySelect.value;
-  const categorySelectValue = categorySelect.value;
-  const searchEverythingNewsValue = searchEverythingNews.value;
-
-  if (!searchEverythingNewsValue) {
-    newsServise.topHeadlines(
-      countrySelectValue,
-      categorySelectValue);
-  } else newsServise.everything(searchEverythingNewsValue);
+function myHttp() {
+  return {
+    request(url, options) {
+      return Promise.resolve().then(() => {
+        return fetch(url, options).then(response => {
+          if (response.status / 100 !== 2) {
+            return Promise.reject(response);
+          }
+        return response.json();
+        });
+      });
+    },
+  };
 }
 
-function onGetResponse(err, res) {
-  if (err) {
-    alert(err);
-    return;
-  }
 
+// Init http module
+const http = myHttp();
+
+function loadNews() {
+  const country = countrySelect.value;
+  const category = categorySelect.value;
+  const search = searchEverythingNews.value;
+  const apiKey = "2c0f1ee00f8f46f5916226f221bf3858";
+  const apiUrl = "https://newsapi.org/v2";
+
+  if (!search) {
+    http.request(`${apiUrl}/top-headlines?country=${country}&category=${category}&apiKey=${apiKey}`)
+      .then(res => onGetResponse(res))
+      .catch(err => alert(err));
+  } else {
+    http.request(`${apiUrl}/everything?q=${search}&apiKey=${apiKey}`)
+      .then(res => onGetResponse(res))
+      .catch(err => alert(err));
+  }
+}
+
+function onGetResponse(res) {
   if (!res.articles.length) {
     alert("Новостей не найдено");
     return;
@@ -117,6 +84,14 @@ function newsTemplate({ url, title, description, urlToImage } = {}) {
   `;
 }
 
+
+
+//events
+document.addEventListener("DOMContentLoaded", function() {
+  M.AutoInit();
+  loadNews();
+});
+
 form.addEventListener("submit", onSubmitHandler);
 
 function onSubmitHandler(e) {
@@ -127,3 +102,6 @@ function onSubmitHandler(e) {
 
   loadNews();
 }
+
+
+
